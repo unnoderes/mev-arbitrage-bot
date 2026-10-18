@@ -1,0 +1,62 @@
+graph TB
+    subgraph "Bot Core Process (Node.js)"
+        Main[Main<br/>index.ts]
+        
+        subgraph "Core Modules"
+            PM[PriceMonitor<br/>价格监听器]
+            PoolMgr[PoolManager<br/>交易池管理]
+            Strategy[Strategy<br/>套利策略]
+            Executor[Executor<br/>交易执行]
+            Logger[Logger<br/>日志系统]
+        end
+        
+        subgraph "Config"
+            Config[Configuration<br/>settings.json]
+            Pools[Pool Definitions<br/>pools.json]
+        end
+        
+        subgraph "Utils"
+            Calc[Calculations<br/>价格计算]
+            Format[Formatters<br/>格式化工具]
+        end
+    end
+    
+    subgraph "External"
+        Provider[ethers.Provider<br/>RPC连接]
+        Wallet[ethers.Wallet<br/>私钥签名]
+        Contract[Contract实例<br/>合约接口]
+    end
+    
+    Main -->|创建| PM
+    Main -->|创建| PoolMgr
+    Main -->|创建| Strategy
+    Main -->|创建| Executor
+    Main -->|创建| Logger
+    
+    PM -->|依赖| Provider
+    PM -->|使用| PoolMgr
+    PM -->|触发事件| Strategy
+    
+    PoolMgr -->|加载| Pools
+    PoolMgr -->|依赖| Provider
+    
+    Strategy -->|使用| Calc
+    Strategy -->|读取| PoolMgr
+    Strategy -->|调用| Executor
+    
+    Executor -->|依赖| Wallet
+    Executor -->|依赖| Contract
+    Executor -->|记录| Logger
+    
+    Logger -->|使用| Format
+    Logger -->|读取| Config
+    
+    Provider -.->|JSON-RPC| Blockchain[Polygon网络]
+    Wallet -.->|签名| Blockchain
+    Contract -.->|调用| Blockchain
+    
+    style PM fill:#e1f5ff
+    style Strategy fill:#fff4e1
+    style Executor fill:#ffe1e1
+    style Logger fill:#e1ffe1
+    style PoolMgr fill:#f0e1ff

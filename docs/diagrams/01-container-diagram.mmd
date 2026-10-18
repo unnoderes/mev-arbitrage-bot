@@ -1,0 +1,33 @@
+C4Container
+    title MEV Arbitrage Bot - Container View
+    
+    Person(operator, "Bot Operator", "部署和监控机器人")
+    
+    System_Boundary(local, "本地Windows电脑") {
+        Container(bot, "Bot Core", "Node.js, TypeScript", "监听价格、计算套利、执行交易")
+        Container(dashboard, "Web Dashboard", "Next.js", "实时监控和统计 [可选]")
+        ContainerDb(logs, "日志存储", "CSV文件", "记录机会和执行结果")
+    }
+    
+    System_Boundary(blockchain, "Polygon网络") {
+        Container(contract, "FlashArbitrage", "Solidity", "原子化执行多步swap")
+        Container(dex, "DEX Routers", "Uniswap V2", "QuickSwap, Uniswap, SushiSwap")
+        ContainerDb(tokens, "ERC20 Tokens", "智能合约", "USDC, WETH, MATIC")
+    }
+    
+    System_Ext(rpc, "Alchemy RPC", "区块链节点访问")
+    
+    Rel(operator, dashboard, "查看状态", "HTTP")
+    Rel(operator, bot, "启动/停止", "CLI")
+    
+    Rel(bot, contract, "发送交易", "JSON-RPC / ethers.js")
+    Rel(bot, rpc, "查询状态/价格", "WebSocket / HTTPS")
+    Rel(bot, logs, "写入日志", "文件IO")
+    Rel(bot, dashboard, "推送更新", "WebSocket")
+    
+    Rel(contract, dex, "调用swap", "合约调用")
+    Rel(contract, tokens, "转账代币", "ERC20 transfer")
+    
+    Rel(rpc, blockchain, "转发请求", "")
+    
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

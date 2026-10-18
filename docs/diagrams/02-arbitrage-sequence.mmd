@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant Block as Polygon新区块
+    participant RPC as Alchemy RPC
+    participant PM as PriceMonitor
+    participant PoolMgr as PoolManager
+    participant Strategy as Strategy
+    participant Executor as Executor
+    participant Contract as FlashArbitrage合约
+    participant DEX as DEX Routers
+    participant Logger as Logger
+    
+    Block->>RPC: 新区块事件 (block N)
+    RPC->>PM: WebSocket推送 blockNumber
+    
+    Note over PM: 触发价格更新
+    PM->>PoolMgr: getPools()
+    PoolMgr-->>PM: [pool1, pool2, ...]
+    
+    par 并行查询储备量
+        PM->>RPC: getReserves(pool1)
+        PM->>RPC: getReserves(pool2)
+        PM->>RPC: getReserves(pool3)
+    end
+    
+    RPC-->>PM: reserves数据
+    PM->>PM: 计算价格
+    PM->>Strategy: emit('priceUpdate', prices)
+    
+    Note over Strategy: 寻找套利机会
+    Strategy->>Strategy: findTriangularPaths('USDC')
+    Strategy->>Strategy: calculateProfit(path, amounts)
+    
+    alt 发现有利可图的机会
+        Strategy->>Strategy: 评估 (利润 > Gas + 阈值)
+        Strategy->>Executor: execute(opportunity)
+        
+        Note over Executor: 预执行检查
+        Executor->>RPC: getBalance(wallet)
+        Executor->>RPC: getFeeData()
+        Executor->>Executor: 最终利润验证
+        
+        alt 仍然有利可图
+            Executor->>Executor: 构建交易calldata
+            Executor->>RPC: estimateGas(tx)
+            RPC-->>Executor: gasLimit
+            
+            Executor->>Executor: 签名交易
+            Executor->>RPC: sendTransaction(signedTx)
+            RPC-->>Executor: txHash
+            
+            Executor->>Logger: log('交易已发送', txHash)
+            
+            Note over Contract,DEX: 链上原子化执行
+            RPC->>Contract: triangularArbitrage()
+            Contract->>DEX: swap1: USDC→WETH
+            DEX-->>Contract: WETH amount
+            Contract->>DEX: swap2: WETH→MATIC
+            DEX-->>Contract: MATIC amount
+            Contract->>DEX: swap3: MATIC→USDC
+            DEX-->>Contract: USDC amount
+            
+            Contract->>Contract: require(profit > 0)
+            Contract-->>RPC: 交易成功
+            
+            RPC->>Executor: 交易确认
+            Executor->>Logger: log('成功', profit, gasUsed)
+            
+        else 不再有利可图
+            Executor->>Logger: log('机会失效')
+        end
+        
+    else 没有机会
+        Strategy->>Logger: log('无套利机会')
+    end
