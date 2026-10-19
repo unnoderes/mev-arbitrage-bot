@@ -307,7 +307,11 @@ amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)
 
 ### 解决方案
 
-#### 方案 1: MVP 阶段跳过 V3 (推荐)
+#### 方案 1: MVP 阶段跳过 V3 —— ❌ 已被推翻，不要采用
+
+> 上链核实后这个方案不成立：SushiSwap 的 USDC/WETH 池只有 0.08 USDC 与 0 WETH，
+> QuickSwap 的 USDC/WPOL 池只有 671 USDC，而 Uniswap V3 的 0.05% 档在 USDC 侧深 11 倍。
+> 「跳过 V3」等于「没有可交易的池子」。改用方案 2，并见 [ADR-0002](./adr/0002-v3-primary.md)。
 
 ```typescript
 // 只监控 V2 风格的 DEX
@@ -337,7 +341,8 @@ function loadPools() {
 ```typescript
 // 如果必须支持 V3，使用链上 Quoter
 const QUOTER_ABI = [
-  'function quoteExactInputSingle(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96) external returns (uint256 amountOut)'
+  // QuoterV2 的入参是结构体，返回值也不止 amountOut
+  'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)'
 ];
 
 async function getV3AmountOut(
@@ -345,7 +350,8 @@ async function getV3AmountOut(
   amountIn: bigint
 ): Promise<bigint> {
   const quoter = new ethers.Contract(
-    UNISWAP_V3_QUOTER,  // 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6
+    UNISWAP_V3_QUOTER,  // Polygon QuoterV2: 0x61fFE014bA17989E743c5F6cB21bF9697530B21e
+                        // 旧地址 0xb27308f9... 是主网 Quoter V1，Polygon 上不可用
     QUOTER_ABI,
     provider
   );

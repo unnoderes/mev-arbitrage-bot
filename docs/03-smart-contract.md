@@ -1,5 +1,15 @@
 # 智能合约设计
 
+> **本文档的合约已作废（2026-10）。** 不要照抄下面的代码。
+> 权威接口与安全不变量见 [`07-final-design.md`](./07-final-design.md) 第 7 节。
+>
+> 三处根本性变化：
+> 1. **去掉 `onlyOwner`**。改为任何人可调用，安全性由「归还闪电贷后计价代币余额增量 ≥ minProfit」保证。
+>    见 [ADR-0003](./adr/0003-permissionless-executor.md)。
+> 2. **不再只调 `IUniswapV2Router02`**。可交易的流动性几乎全在 Uniswap V3，
+>    路由步骤需支持 `SwapRouter02.exactInputSingle`。见 [ADR-0002](./adr/0002-v3-primary.md)。
+> 3. **利润门槛不再是固定值**。改为 `max(0.02 计价单位, 2 × Gas)`，且合约侧有 `ownerMinProfit` 下限。
+
 ## 合约架构
 
 ```

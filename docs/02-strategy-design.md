@@ -1,5 +1,10 @@
 # 套利策略设计
 
+> **本文档部分过时（2026-10）。** 权威版本是 [`07-final-design.md`](./07-final-design.md)。
+> 已修正：全部浮点运算改为 BigInt（原第 183、280、296 行）；最优规模改为三分搜索。
+> 未修正但已作废：本文只描述 V2 的 `x*y=k`。可交易的流动性几乎全在 Uniswap V3，
+> 而 V3 的定价不能用储备量表达——见 [ADR-0002](./adr/0002-v3-primary.md)。
+
 ## 策略1: 三角套利 (Triangular Arbitrage)
 
 ### 原理
@@ -66,24 +71,35 @@ function calculateTriangularProfit(
 套利利润是非线性的,存在一个最优输入金额。
 
 ```typescript
+// 固定路由下，毛利润对投入金额是单峰函数，用三分搜索。
+// 不要用固定 20 步网格：精度不足，且可能整段错过峰值。
 function findOptimalAmount(
   path: [Pool, Pool, Pool],
   minAmount: bigint,
-  maxAmount: bigint,
-  steps: number = 20
+  maxAmount: bigint
 ): { amount: bigint; profit: bigint } {
-  let best = { amount: 0n, profit: 0n };
-  const step = (maxAmount - minAmount) / BigInt(steps);
-  
-  for (let i = 0; i <= steps; i++) {
-    const testAmount = minAmount + step * BigInt(i);
-    const profit = calculateTriangularProfit(path, testAmount);
-    
-    if (profit > best.profit) {
-      best = { amount: testAmount, profit };
-    }
+  let lo = minAmount;
+  let hi = maxAmount;
+
+  for (let i = 0; i < 70; i++) {
+    const third = (hi - lo) / 3n;
+    if (third === 0n) break;
+    const m1 = lo + third;
+    const m2 = hi - third;
+
+    const p1 = calculateTriangularProfit(path, m1);
+    const p2 = calculateTriangularProfit(path, m2);
+
+    if (p1 < p2) lo = m1 + 1n;
+    else hi = m2 - 1n;
   }
-  
+
+  let best = { amount: 0n, profit: 0n };
+  const start = lo > 2n ? lo - 2n : 1n;
+  for (let a = start; a <= hi + 2n; a++) {
+    const p = calculateTriangularProfit(path, a);
+    if (p > best.profit) best = { amount: a, profit: p };
+  }
   return best;
 }
 ```
@@ -178,26 +194,34 @@ function findCrossDexOpportunities(
     if (pools.length < 2) continue;
     
     // 计算所有pools的当前价格
+    // 用交叉相乘比较，绝不做浮点除法
     const prices = pools.map(p => ({
       pool: p,
-      price: Number(p.reserve1) / Number(p.reserve0)
+      priceNum: p.reserve1,
+      priceDen: p.reserve0
     }));
     
     // 找到最低价和最高价
-    prices.sort((a, b) => a.price - b.price);
+    prices.sort((a, b) => {
+      const left = a.priceNum * b.priceDen;
+      const right = b.priceNum * a.priceDen;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
     const lowest = prices[0];
     const highest = prices[prices.length - 1];
     
     // 计算价差百分比
-    const spreadPct = (highest.price - lowest.price) / lowest.price * 100;
+    const spreadBps =
+      ((highest.priceNum * lowest.priceDen - lowest.priceNum * highest.priceDen) * 10000n) /
+      (lowest.priceNum * highest.priceDen);
     
-    // 如果价差 > 0.3%,认为有套利机会
-    if (spreadPct > 0.3) {
+    // 如果价差 > 30 基点，认为有套利机会
+    if (spreadBps > 30n) {
       opportunities.push({
         type: 'cross-dex',
         buyPool: lowest.pool,
         sellPool: highest.pool,
-        spread: spreadPct
+        spreadBps
       });
     }
   }
@@ -277,7 +301,7 @@ async function findBestOpportunity(): Promise<Opportunity | null> {
   );
   
   // 找到最佳机会
-  results.sort((a, b) => Number(b.profit - a.profit));
+  results.sort((a, b) => (a.profit === b.profit ? 0 : a.profit < b.profit ? 1 : -1));
   return results[0].profit > 0n ? results[0] : null;
 }
 ```
@@ -290,11 +314,13 @@ function calculateSlippage(opp: Opportunity): number {
   // 实际执行会推动价格
   // 简化模型: 滑点 ≈ amountIn / poolLiquidity
   const totalLiquidity = opp.path.reduce((sum, pool) => {
-    return sum + Number(pool.reserve0);
+    return sum + pool.reserve0;
   }, 0);
   
-  const slippagePct = Number(opp.amountIn) / totalLiquidity * 100;
-  return slippagePct;
+  // 仅对 V2 成立。V3 池子的余额大部分停在价格区间之外，
+  // 可用深度必须用 QuoterV2 在参考规模下实测（见 07-final-design.md 第 4 节）。
+  const slippageBps = (opp.amountIn * 10000n) / totalLiquidity;
+  return Number(slippageBps);
 }
 ```
 
