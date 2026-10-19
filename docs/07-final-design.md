@@ -206,12 +206,42 @@ npm run probe -- --from <block> --to <block>     # 默认最近 2000 个区块
 
 ---
 
-## 12. 实施前必须核实的三件事
+## 12. 实施前核实结果
 
-1. `@uniswap/v2-periphery@1.1.0-beta.0` 在 solc 0.8.20 下能否编译。这个包是 0.5/0.6 时代的，仓库里 `node_modules` 未安装，无法静态确认。不能编译就手写最小接口。
-2. Alchemy 免费版是否允许 mainnet fork、配额是否够跑 2000 区块的 probe。
-3. `hardhat.config.ts` 目前指向 `mumbai`（chainId 80001，已于 2024 年 4 月关停），且 `forking.enabled = false`。需要改成 Amoy（80002）并打开 fork。
-4. `.env.example` 仍是旧参数：`MUMBAI_RPC_URL`、`MIN_PROFIT_USDC=2`、`MAX_TRADE_SIZE_USDC=50`、`ENABLE_WEB_DASHBOARD=true`。本期只观测，不需要 `PRIVATE_KEY`，也不需要 Dashboard。
+| 项 | 状态 | 证据 |
+|---|---|---|
+| `@uniswap/v2-periphery@1.1.0-beta.0` 能否在 solc 0.8.20 下编译 | ✅ 能 | 实装 1.1.0-beta.0 并用 solc 0.8.20+commit.a1b79de6 编译一个 import 了 `IUniswapV2Router02` 的合约：通过，bytecode 1,073 字节，仅 SPDX 警告，无错误。接口的 pragma 是 `>=0.6.2`，允许 0.8.20 |
+| 能否用免费 RPC 做 Polygon 主网 fork | ✅ 能（不依赖 Alchemy） | hardhat 2.22.17 对 `https://polygon.drpc.org` 在区块 95,800,000 fork 成功：读到真实 `slot0`，池子代码 22,142 字节 |
+| Amoy 可用 / Mumbai 已死 | ✅ 确认 | `polygon-amoy-bor-rpc.publicnode.com` 返回 chainId `0x13882`（80002）；Mumbai 的公共 RPC 无响应 |
+| `.env.example` 仍是旧参数 | ✅ 确认 | 含 `MUMBAI_RPC_URL`、`MIN_PROFIT_USDC=2`、`MAX_TRADE_SIZE_USDC=50`、`ENABLE_WEB_DASHBOARD=true` |
+| Alchemy 免费版具体配额 | ⚠️ 未验证（无 API key） | 但依赖已解除：fork 与历史读取都可用免费公共 RPC 完成。参考：Alchemy 的 `eth_call` = 26 CU，probe 2000 区块约 10,000 次 `eth_call` ≈ 260,000 CU |
+
+### 12.1 fork 的必要配置（实测踩到）
+
+Hardhat 对 Polygon 缺少内置的 hardfork 历史，直接 fork 会报：
+
+```
+No known hardfork for execution on historical block <n> in chain with id 137.
+The node was not configured with a hardfork activation history.
+```
+
+必须在 `networks.hardhat` 下显式声明（注意 `paris` 不是合法值，要用 `merge`）：
+
+```js
+chains: {
+  137: { hardforkHistory: { london: 0, merge: 0, shanghai: 0 } },
+}
+```
+
+### 12.2 历史状态深度与限流
+
+- `polygon.drpc.org` 能对至少 **1,000,000 区块前**的状态执行 `eth_call`，2000 区块的 probe 不需要归档专用节点。
+- `polygon-bor-rpc.publicnode.com` 在突发请求下会返回 403。probe 必须带重试与退避，并且支持多端点轮换——否则一次限流会让整个观测窗口中断。
+
+### 12.3 仍需在实现阶段做的事
+
+- `hardhat.config.ts` 仍指向 `mumbai` 且 `forking.enabled = false`，需要改成 Amoy 并打开 fork（按 12.1 配好 hardforkHistory）。
+- `.env.example` 的参数需要随实现一并调整；本期只观测，不需要 `PRIVATE_KEY`，也不需要 Dashboard。
 
 ---
 
