@@ -1,5 +1,13 @@
 # 快速开始指南
 
+> **⚠️ 本文档部分过时（2026-10）。** 当前设计见 [`07-final-design.md`](./07-final-design.md)。
+>
+> 需要注意的变化：
+> - **Mumbai 测试网已关停**（2024 年 4 月），已由 Amoy（chainId 80002）取代；下文所有 `--network mumbai` 都应改为 `amoy`。
+> - 本期是**只观测模式**，不需要私钥，也不需要给合约转资金。
+> - 最小利润阈值不是 2 USDC，而是 `max(0.02, 2 × Gas)`。
+> - 「加载了 9 个交易池」的预期输出不再成立，池子由注册表枚举得出。
+
 ## 第一步: 环境准备
 
 ### 1. 安装 Node.js
@@ -67,14 +75,18 @@ npx hardhat compile
 
 ## 第三步: 部署合约
 
-### 测试网部署 (Mumbai - 推荐先测试)
+### 测试网部署 (Amoy - 仅用于验证部署流程)
+
+> Mumbai 已于 2024 年 4 月关停，下面改用 Amoy（chainId 80002）。
+> 注意：Amoy 上没有真实流动性与借贷协议，任何「利润」数字都是假的；
+> 真实的策略验证必须在 Polygon 主网 fork 上做。
 
 ```bash
-# 1. 从水龙头获取测试MATIC
-# https://mumbaifaucet.com
+# 1. 从水龙头获取测试 POL
+# https://faucet.polygon.technology/
 
 # 2. 部署合约
-npx hardhat run scripts/deploy.ts --network mumbai
+npx hardhat run scripts/deploy.ts --network amoy
 
 # 输出示例:
 # ✅ 合约已部署: 0x1234...

@@ -1,5 +1,13 @@
 # 开发环境配置说明
 
+> **⚠️ 本文档部分过时（2026-10）。** 当前设计见 [`docs/07-final-design.md`](docs/07-final-design.md)。
+>
+> - 配置里的 `mumbai`（chainId 80001）已关停，应改为 Amoy（80002）；
+>   且 `hardhat.config.ts` 的 `forking.enabled` 目前是 `false`，fork 测试跑不起来。
+> - `MIN_PROFIT_USDC` 默认值不是 2，而是 `max(0.02, 2 × Gas)`。
+> - 只观测模式**不需要** `PRIVATE_KEY`。
+> - `@uniswap/v2-periphery@1.1.0-beta.0` 是 0.5/0.6 时代的包，能否在 solc 0.8.20 下编译尚未核实。
+
 ## ✅ 环境初始化完成
 
 本文档记录了项目的开发环境配置状态。
@@ -181,8 +189,8 @@ npm run dev
    - 使用专门的开发钱包
 
 2. **测试网优先**
-   - 先在 Mumbai 测试网充分测试
-   - 确认无误后再部署到 Polygon 主网
+   - Mumbai 已关停，改用 Amoy（chainId 80002）
+   - 但 Amoy 只能验证「部署流程能跑通」，策略验证必须在 Polygon 主网 fork 上做
 
 3. **小额资金**
    - 初始建议使用 $50-100 USDC

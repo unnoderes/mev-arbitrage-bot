@@ -1,5 +1,17 @@
 # 实施指南 - 给AI编码模型
 
+> **⚠️ 不要按本文档编码（2026-10）。**
+> 权威设计见 [`07-final-design.md`](./07-final-design.md)，术语见 [`GLOSSARY.md`](../GLOSSARY.md)，
+> 决策理由见 [`docs/adr/`](./adr/)。
+>
+> 本文中的类型与接口已作废，原因：
+> 1. `Pool` 用 `reserves` 描述状态 —— 只对 V2 成立，而可交易的流动性几乎全在 V3；
+> 2. `Config` 里的 `minProfit = 2`、`maxTradeSize = 50`、`pollingInterval` 均已重新定义；
+> 3. 模块切法（`PoolManager / PriceMonitor / Executor / Logger`）已被 `venues / registry / strategy / observe / chain` 取代；
+> 4. `src/config/pools.json` 的硬编码池子清单已改为从工厂枚举 + 深度下限过滤。
+>
+> 本文保留作为历史记录。
+
 本文档为低成本AI模型(如GPT-3.5, Claude Haiku)提供完整的代码实施指令。
 
 ## 项目初始化
